@@ -31,7 +31,7 @@ func NewPool(ctx context.Context) (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("Gagal memuat pool: %w", err)
+		return nil, fmt.Errorf("Gagal memuat pgxpool: %w", err)
 	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -39,7 +39,7 @@ func NewPool(ctx context.Context) (*pgxpool.Pool, error) {
 
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("Gagal terhubung ke database: %w", err)
+		return nil, fmt.Errorf("Gagal terhubung ke PostgrSQL: %w", err)
 	}
 
 	return pool, nil

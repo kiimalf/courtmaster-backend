@@ -8,6 +8,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+var (
+	ErrNotFound = errors.New("data tidak ditemukan")
+	ErrConflict = errors.New("konflik data atau versi telah berubah")
+)
+
 const (
 	codeUniqueViolation      = "23505"
 	codeSerializationFailure = "40001"
