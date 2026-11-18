@@ -1,0 +1,99 @@
+x-app: &app
+  build: .
+  image: courtmaster:local
+  restart: unless-stopped
+  environment:
+    APP_PORT: "8080"
+    LOG_LEVEL: info
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_USER: courtmaster
+    DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD}
+    DB_NAME: courtmaster_db
+    DB_SSLMODE: disable
+    DB_MAX_CONNS: "10"
+    JWT_SECRET: ${JWT_SECRET:?JWT_SECRET}
+    MONGO_URI: mongodb://mongo:27017
+    MONGO_DATABASE: courtmaster_mongo
+    MONGO_MAX_POOL: "20"
+    REDIS_ADDR: redis:6379
+    REDIS_PASSWORD: ""
+    REDIS_DB: "0"
+    WORKER_CONCURRENCY: "5"
+    RELAY_INTERVAL_MS: "2000"
+    RELAY_BATCH: "50"
+    ALLOWED_ORIGINS: "http://localhost:5173"
+    SWAGGER_ENABLED: "true"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    mongo:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  api:
+    <<: *app
+    command: ["-role=api"]
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *app
+    command: ["-role=worker"]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: courtmaster
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: courtmaster_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtmaster -d courtmaster_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongo:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  mongodata:
+  redisdata:
