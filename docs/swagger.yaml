@@ -1,0 +1,660 @@
+basePath: /api/v1
+definitions:
+  model.AddReplyRequest:
+    properties:
+      comment:
+        maxLength: 300
+        minLength: 2
+        type: string
+    required:
+    - comment
+    type: object
+  model.CreateBookingRequest:
+    properties:
+      court_id:
+        type: integer
+      date:
+        type: string
+      slot_ids:
+        items:
+          type: integer
+        maxItems: 4
+        minItems: 1
+        type: array
+    required:
+    - court_id
+    - date
+    - slot_ids
+    type: object
+  model.CreateCourtRequest:
+    properties:
+      hourly_rate:
+        type: number
+      name:
+        maxLength: 100
+        minLength: 3
+        type: string
+      sport_type:
+        enum:
+        - padel
+        - badminton
+        - futsal
+        - basketball
+        type: string
+    required:
+    - hourly_rate
+    - name
+    - sport_type
+    type: object
+  model.CreateReviewRequest:
+    properties:
+      comment:
+        maxLength: 500
+        minLength: 5
+        type: string
+      rating:
+        maximum: 5
+        minimum: 1
+        type: integer
+      tags:
+        items:
+          type: string
+        maxItems: 5
+        type: array
+    required:
+    - comment
+    - rating
+    type: object
+  model.CreateSparringRequest:
+    properties:
+      court_id:
+        type: integer
+      date:
+        type: string
+      end_time:
+        type: string
+      max_participants:
+        maximum: 20
+        minimum: 2
+        type: integer
+      price_per_person:
+        minimum: 0
+        type: number
+      start_time:
+        type: string
+      title:
+        maxLength: 150
+        minLength: 5
+        type: string
+    required:
+    - court_id
+    - date
+    - end_time
+    - max_participants
+    - price_per_person
+    - start_time
+    - title
+    type: object
+  model.LoginRequest:
+    properties:
+      email:
+        type: string
+      identifier:
+        type: string
+      password:
+        type: string
+    required:
+    - password
+    type: object
+  model.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  model.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      password:
+        minLength: 8
+        type: string
+      role_id:
+        enum:
+        - 2
+        - 3
+        type: integer
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - name
+    - password
+    - role_id
+    - username
+    type: object
+  model.SwapBookingRequest:
+    properties:
+      booking_id:
+        type: integer
+      court_id:
+        type: integer
+      date:
+        type: string
+      new_slot_id:
+        type: integer
+      old_slot_id:
+        type: integer
+    required:
+    - booking_id
+    - court_id
+    - date
+    - new_slot_id
+    - old_slot_id
+    type: object
+  model.UpdateHourlyRateRequest:
+    properties:
+      hourly_rate:
+        type: number
+      version:
+        type: integer
+    required:
+    - hourly_rate
+    - version
+    type: object
+  model.WebResponse:
+    properties:
+      data: {}
+      errors: {}
+      message:
+        type: string
+      meta: {}
+      success:
+        type: boolean
+    type: object
+info:
+  contact: {}
+  description: Sistem Backend Reservasi Gelanggang Olahraga & Matchmaking Komunitas
+  title: CourtMaster Backend API
+  version: "1.0"
+paths:
+  /admin/queue:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Monitoring statistik antrean Asynq dan outbox event (Admin Only)
+      tags:
+      - Admin
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Kredensial Login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Login akun dan dapatkan Access Token + Refresh Token
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout dan mencabut semua token aktif pengguna
+      tags:
+      - Auth
+  /auth/me:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Profil pengguna yang sedang login
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh Token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Rotasi Refresh Token untuk mendapatkan token baru
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data Registrasi
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Pendaftaran akun pengguna baru
+      tags:
+      - Auth
+  /bookings:
+    get:
+      parameters:
+      - description: Base64 Keyset Cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Batas jumlah data (default 10, maksimal 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      - text/csv
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Riwayat booking pengguna (Keyset Cursor & CSV Content Negotiation)
+      tags:
+      - Bookings
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data Pemesanan
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateBookingRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat reservasi lapangan baru (ACID Transaction)
+      tags:
+      - Bookings
+  /bookings/swap:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data Penukaran Slot
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.SwapBookingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Tukar slot jadwal pemesanan lapangan (Deadlock-Free Sorted Slot Locks)
+      tags:
+      - Bookings
+  /courts:
+    get:
+      parameters:
+      - description: Filter jenis olahraga
+        in: query
+        name: sport_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Daftar seluruh gelanggang olahraga
+      tags:
+      - Courts
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data Lapangan
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateCourtRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Tambah gelanggang baru (Admin/Manager)
+      tags:
+      - Courts
+  /courts/{id}:
+    get:
+      parameters:
+      - description: Court ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Ambil detail lapangan berdasarkan ID
+      tags:
+      - Courts
+  /courts/{id}/rate:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Court ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update Tarif
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateHourlyRateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Update tarif per jam dengan Optimistic Locking
+      tags:
+      - Courts
+  /courts/{id}/reviews:
+    get:
+      parameters:
+      - description: Court ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Ambil daftar ulasan gelanggang
+      tags:
+      - Reviews
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Court ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Data Review
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateReviewRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Beri ulasan dan rating pada lapangan (Wajib ada riwayat sewa di SQL)
+      tags:
+      - Reviews
+  /courts/{id}/reviews/summary:
+    get:
+      parameters:
+      - description: Court ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Ringkasan agregasi rating & total ulasan gelanggang
+      tags:
+      - Reviews
+  /courts/{id}/slots:
+    get:
+      parameters:
+      - description: Court ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Tanggal format YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Ambil jadwal slot jam ketersediaan lapangan
+      tags:
+      - Courts
+  /notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Ambil daftar notifikasi milik pengguna yang sedang login
+      tags:
+      - Notifications
+  /notifications/outbox/retry:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Trigger manual relay event outbox yang tertunda (Admin Only)
+      tags:
+      - Notifications
+  /reviews/{id}/helpful:
+    post:
+      parameters:
+      - description: Review ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Beri upvote bermanfaat pada ulasan (Anti-Self-Vote)
+      tags:
+      - Reviews
+  /reviews/{id}/replies:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Review ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Balasan Ulasan
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.AddReplyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Tambah balasan pada ulasan ($push atomik maksimal 50 balasan)
+      tags:
+      - Reviews
+  /sparrings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      summary: Ambil daftar sesi mabar sparring yang masih berstatus OPEN
+      tags:
+      - Sparrings
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data Sesi Sparring
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateSparringRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat sesi mabar / sparring baru
+      tags:
+      - Sparrings
+  /sparrings/{id}/join:
+    post:
+      parameters:
+      - description: Sparring ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.WebResponse'
+      security:
+      - BearerAuth: []
+      summary: Bergabung ke sesi mabar sparring
+      tags:
+      - Sparrings
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
