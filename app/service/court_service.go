@@ -152,6 +152,15 @@ func (s *CourtService) UpdateHourlyRate(c *fiber.Ctx) error {
 	if errs := helper.ValidateStruct(req); errs != nil {
 		return helper.Validation(errs)
 	}
+	if req.HourlyRate > 2_000_000 {
+		return helper.BadRequest(ErrMaxRateExceeded.Error())
+	}
+
+	if _, err := s.repo.FindByID(ctx, id); errors.Is(err, repository.ErrNotFound) {
+		return helper.NotFound("lapangan tidak ditemukan")
+	} else if err != nil {
+		return helper.Internal(err)
+	}
 
 	err := s.repo.UpdateHourlyRateOptimistic(ctx, id, req.HourlyRate, req.Version)
 	if errors.Is(err, repository.ErrConflict) {

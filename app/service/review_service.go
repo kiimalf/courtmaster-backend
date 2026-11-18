@@ -78,6 +78,9 @@ func (s *ReviewService) CreateReview(c *fiber.Ctx) error {
 	}
 
 	if err := s.repo.Create(ctx, &rev); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return helper.Conflict("anda sudah memberikan ulasan untuk gelanggang ini")
+		}
 		return helper.Internal(err)
 	}
 
@@ -212,6 +215,9 @@ func (s *ReviewService) AddReply(c *fiber.Ctx) error {
 	}
 
 	if err := s.repo.AddReply(ctx, reviewID, reply); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return helper.NotFound("ulasan tidak ditemukan")
+		}
 		return helper.Internal(err)
 	}
 	return helper.Success(c, fiber.StatusOK, "balasan berhasil ditambahkan", reply)

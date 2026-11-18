@@ -14,6 +14,7 @@ import (
 )
 
 type ReviewRepository interface {
+	EnsureIndexes(ctx context.Context) error
 	Create(ctx context.Context, review *model.CourtReview) error
 	FindByID(ctx context.Context, reviewID string) (*model.CourtReview, error)
 	FindByCourtID(ctx context.Context, courtID int64) ([]model.CourtReview, error)
@@ -44,6 +45,21 @@ func NewReviewRepository(db *mongo.Database) ReviewRepository {
 	return &reviewMongoRepo{col: col}
 }
 
+// EnsureIndexes membuat indeks compound unique (court_id, user_id) dan multikey (court_id, tags)
+func (r *reviewMongoRepo) EnsureIndexes(ctx context.Context) error {
+	models := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "court_id", Value: 1}, {Key: "user_id", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{Key: "court_id", Value: 1}, {Key: "tags", Value: 1}},
+		},
+	}
+	_, err := r.col.Indexes().CreateMany(ctx, models)
+	return err
+}
+
 func (r *reviewMongoRepo) Create(ctx context.Context, rev *model.CourtReview) error {
 	doc := reviewDoc{
 		CourtID:   rev.CourtID,
@@ -59,6 +75,9 @@ func (r *reviewMongoRepo) Create(ctx context.Context, rev *model.CourtReview) er
 
 	res, err := r.col.InsertOne(ctx, doc)
 	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return ErrConflict
+		}
 		return fmt.Errorf("reviewRepo.Create: %w", err)
 	}
 	if oid, ok := res.InsertedID.(bson.ObjectID); ok {
@@ -128,7 +147,7 @@ func (r *reviewMongoRepo) FindByCourtID(ctx context.Context, courtID int64) ([]m
 func (r *reviewMongoRepo) AddReply(ctx context.Context, reviewID string, reply model.ReviewReply) error {
 	objID, err := bson.ObjectIDFromHex(reviewID)
 	if err != nil {
-		return err
+		return ErrNotFound
 	}
 	update := bson.M{
 		"$push": bson.M{
@@ -138,8 +157,14 @@ func (r *reviewMongoRepo) AddReply(ctx context.Context, reviewID string, reply m
 			},
 		},
 	}
-	_, err = r.col.UpdateOne(ctx, bson.M{"_id": objID}, update)
-	return err
+	res, err := r.col.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *reviewMongoRepo) VoteHelpful(ctx context.Context, reviewID string, userID int64) error {

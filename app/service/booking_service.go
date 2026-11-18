@@ -395,6 +395,12 @@ func (s *BookingService) JoinSparring(c *fiber.Ctx) error {
 		return helper.BadRequest("ID sparring tidak valid")
 	}
 
+	if _, err := s.bookingRepo.FindSparringByID(ctx, sparringID); errors.Is(err, repository.ErrNotFound) {
+		return helper.NotFound("sesi sparring tidak ditemukan")
+	} else if err != nil {
+		return helper.Internal(err)
+	}
+
 	err := s.txManager.WithTx(ctx, func(tx repository.DBTX) error {
 		return s.bookingRepo.JoinSparringAtomic(ctx, tx, sparringID, user.ID)
 	})

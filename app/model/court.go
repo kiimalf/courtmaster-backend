@@ -30,6 +30,6 @@ type CreateCourtRequest struct {
 }
 
 type UpdateHourlyRateRequest struct {
-	HourlyRate float64 `json:"hourly_rate" validate:"required,gt=0"`
+	HourlyRate float64 `json:"hourly_rate" validate:"required,gt=0,lte=2000000"`
 	Version    int     `json:"version" validate:"required,gt=0"`
 }

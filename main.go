@@ -107,6 +107,9 @@ func startAPI(logger *slog.Logger, pool *pgxpool.Pool) *fiber.App {
 	userRepo := repository.NewUserRepository(pool)
 	tokenRepo := repository.NewTokenRepository(pool)
 	reviewRepo := repository.NewReviewRepository(mongoDB)
+	if err := reviewRepo.EnsureIndexes(context.Background()); err != nil {
+		logger.Warn("gagal_membuat_indeks_mongodb", slog.String("error", err.Error()))
+	}
 	bookingRepo := repository.NewBookingRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
 	notifRepo := repository.NewNotificationRepository(pool)
