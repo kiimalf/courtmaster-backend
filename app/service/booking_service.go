@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 type BookingService struct {
 	bookingRepo repository.BookingRepository
 	courtRepo   repository.CourtRepository
+	outboxRepo  repository.OutboxRepository
 	txManager   *repository.TxManager
 	logger      *slog.Logger
 }
@@ -25,12 +27,14 @@ type BookingService struct {
 func NewBookingService(
 	bookingRepo repository.BookingRepository,
 	courtRepo repository.CourtRepository,
+	outboxRepo repository.OutboxRepository,
 	txManager *repository.TxManager,
 	logger *slog.Logger,
 ) *BookingService {
 	return &BookingService{
 		bookingRepo: bookingRepo,
 		courtRepo:   courtRepo,
+		outboxRepo:  outboxRepo,
 		txManager:   txManager,
 		logger:      logger,
 	}
@@ -119,7 +123,35 @@ func (s *BookingService) CreateBooking(c *fiber.Ctx) error {
 			return err
 		}
 
-		return s.bookingRepo.LockAndAssignSlots(ctx, tx, req.CourtID, req.Date, req.SlotIDs, booking.ID)
+		if err := s.bookingRepo.LockAndAssignSlots(ctx, tx, req.CourtID, req.Date, req.SlotIDs, booking.ID); err != nil {
+			return err
+		}
+
+		// Transactional Outbox: event dicatat pada transaksi ACID yang sama dengan
+		// booking sehingga tidak ada dual-write dan tidak ada pesan yang hilang.
+		if s.outboxRepo == nil {
+			s.logger.Warn("outbox_repository_nil_booking_event_skipped",
+				slog.Int64("booking_id", booking.ID),
+			)
+			return nil
+		}
+
+		payload, err := json.Marshal(model.BookingCreatedPayload{
+			BookingID:   booking.ID,
+			BookingCode: booking.BookingCode,
+			UserID:      user.ID,
+			CourtID:     req.CourtID,
+			Date:        req.Date,
+			TotalAmount: booking.TotalAmount,
+		})
+		if err != nil {
+			return fmt.Errorf("serialisasi payload booking: %w", err)
+		}
+
+		return s.outboxRepo.CreateTx(ctx, tx, &model.OutboxEvent{
+			EventType: model.EventTypeBookingCreated,
+			Payload:   payload,
+		})
 	})
 
 	if errors.Is(err, repository.ErrConflict) {
