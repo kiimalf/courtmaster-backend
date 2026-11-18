@@ -86,7 +86,7 @@ func newErrorHandler(logger *slog.Logger) fiber.ErrorHandler {
 			Success:   false,
 			Code:      appErr.Code,
 			Message:   appErr.Message,
-			Fields:    appErr.Fields,
+			Errors:    appErr.Fields,
 			RequestID: requestID,
 		})
 	}

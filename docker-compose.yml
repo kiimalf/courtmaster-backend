@@ -8,11 +8,11 @@ x-app: &app
     DB_HOST: postgres
     DB_PORT: "5432"
     DB_USER: courtmaster
-    DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD}
+    DB_PASSWORD: ${DB_PASSWORD:-secret}
     DB_NAME: courtmaster_db
     DB_SSLMODE: disable
     DB_MAX_CONNS: "10"
-    JWT_SECRET: ${JWT_SECRET:?JWT_SECRET}
+    JWT_SECRET: ${JWT_SECRET:-supersecretkey_courtmaster_min32chars_demo!}
     MONGO_URI: mongodb://mongo:27017
     MONGO_DATABASE: courtmaster_mongo
     MONGO_MAX_POOL: "20"
